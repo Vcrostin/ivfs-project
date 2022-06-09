@@ -12,7 +12,7 @@ int main() {
     if (file != nullptr) {
         std::cerr << "Expected Create" << "\n";
     }
-    int numBytes = ivfs.Write(file, "SOME USEFUL INFORMATION", 11);
+    size_t numBytes = ivfs.Write(file, "SOME USEFUL INFORMATION", 11);
     if (numBytes != 11) {
         std::cerr << "Not expected Write" << "\n";
     }

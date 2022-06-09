@@ -9,6 +9,7 @@
 #include <utility>
 #include <cstring>
 #include <iterator>
+#include <mutex>
 #include "utils.h"
 
 namespace TestTask {
@@ -18,6 +19,8 @@ namespace TestTask {
         bool isWriteOpen;
         bool isReadOpen;
     public:
+
+        std::mutex curMutex;
 
         inline bool IsReadOpen() const {
             return isReadOpen;
@@ -79,6 +82,7 @@ namespace TestTask {
             }
             if (cur->IsWriteOpen())
                 return nullptr;
+            std::lock_guard lock(cur->curMutex);
             cur->SetRead();
             return cur;
         }
@@ -91,14 +95,15 @@ namespace TestTask {
             if (createdFile->IsReadOpen()) {
                 return nullptr;
             }
+            std::lock_guard lock2(createdFile->curMutex);
             createdFile->SetWrite();
             return createdFile;
         }
 
-        size_t Read(File *f, std::back_insert_iterator<std::string>&& backInserterString, size_t len) {
+        size_t Read(File *f, std::back_insert_iterator<std::string> &&backInserterString, size_t len) {
             auto pr = f->Read(len);
             if (pr.first != 0) {
-                for (auto s : pr.second) {
+                for (auto s: pr.second) {
                     backInserterString = s;
                 }
             }
@@ -106,14 +111,18 @@ namespace TestTask {
         }
 
         size_t Write(File *f, std::string_view str, size_t len) {
+            std::lock_guard lock(f->curMutex);
             return f->Write(str.substr(0, len));
         }
 
         void Close(File *f) {
+            std::lock_guard lock(f->curMutex);
             f->Close();
         }
 
     private:
+        std::mutex setMutex;
+
         File *FindFile(std::string_view fileName) {
             auto splittedStr = StringSplit(fileName, '/');
             if (splittedStr.empty())
@@ -137,6 +146,7 @@ namespace TestTask {
             if (splittedStr.empty())
                 return nullptr;
             File *cur = root;
+            std::lock_guard lock(setMutex);
             for (size_t i = 0; i < splittedStr.size(); ++i) {
                 if (cur->children.contains(std::string(splittedStr[i]))) {
                     cur = cur->children[std::string(splittedStr[i])];
