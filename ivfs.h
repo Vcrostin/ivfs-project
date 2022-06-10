@@ -74,6 +74,14 @@ namespace TestTask {
 
         explicit File(bool isDirectory = false) : isDirectory(isDirectory), isWriteOpen(false), isReadOpen(false) {
         }
+
+        ~File() {
+            if (!children.empty()) {
+                for (auto &elem: children) {
+                    delete elem.second;
+                }
+            }
+        }
     };
 
     struct IVFS {
@@ -87,6 +95,12 @@ namespace TestTask {
             std::lock_guard lock(cur->curMutex);
             cur->SetRead();
             return cur;
+        }
+
+        IVFS() = default;
+
+        ~IVFS() {
+            delete root;
         }
 
         File *Create(std::string_view fileName) {
@@ -122,7 +136,7 @@ namespace TestTask {
             f->Close();
         }
 
-        bool SaveTree(const std::string& fileOutName) {
+        bool SaveTree(const std::string &fileOutName) {
             std::lock_guard lock(setMutex);
             nlohmann::json j;
             RecursiveSaveTree(root, j);
@@ -131,12 +145,12 @@ namespace TestTask {
             return true;
         }
 
-        bool LoadTree(const std::string& fileOutName) {
+        bool LoadTree(const std::string &fileOutName) {
             std::lock_guard lock(setMutex);
             nlohmann::json j;
             std::ifstream ist(fileOutName);
             ist >> j;
-            for (auto& [key, value] : j.items()) {
+            for (auto &[key, value]: j.items()) {
                 auto file = Create(key);
                 auto writeStr = value.get<std::string>();
                 if (file != nullptr) {
@@ -194,7 +208,7 @@ namespace TestTask {
             return cur;
         }
 
-        void RecursiveSaveTree(File *cur, nlohmann::json &json, const std::string& fullPath = "") const {
+        void RecursiveSaveTree(File *cur, nlohmann::json &json, const std::string &fullPath = "") const {
             if (cur != nullptr) {
                 if (cur->isDirectory) {
                     for (auto &elem: cur->children) {
