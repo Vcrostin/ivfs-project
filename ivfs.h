@@ -10,7 +10,9 @@
 #include <cstring>
 #include <iterator>
 #include <mutex>
+#include <fstream>
 #include "utils.h"
+#include "json.hpp"
 
 namespace TestTask {
     struct File {
@@ -120,6 +122,31 @@ namespace TestTask {
             f->Close();
         }
 
+        bool SaveTree(const std::string& fileOutName) {
+            std::lock_guard lock(setMutex);
+            nlohmann::json j;
+            RecursiveSaveTree(root, j);
+            std::ofstream ost(fileOutName);
+            ost << j;
+            return true;
+        }
+
+        bool LoadTree(const std::string& fileOutName) {
+            std::lock_guard lock(setMutex);
+            nlohmann::json j;
+            std::ifstream ist(fileOutName);
+            ist >> j;
+            for (auto& [key, value] : j.items()) {
+                auto file = Create(key);
+                auto writeStr = value.get<std::string>();
+                if (file != nullptr) {
+                    Write(file, writeStr, writeStr.size());
+                    Close(file);
+                }
+            }
+            return true;
+        }
+
     private:
         std::mutex setMutex;
 
@@ -165,6 +192,22 @@ namespace TestTask {
                 return nullptr;
             }
             return cur;
+        }
+
+        void RecursiveSaveTree(File *cur, nlohmann::json &json, const std::string& fullPath = "") const {
+            if (cur != nullptr) {
+                if (cur->isDirectory) {
+                    for (auto &elem: cur->children) {
+                        RecursiveSaveTree(elem.second, json, fullPath + "/" + elem.first);
+                    }
+                } else {
+                    std::string pathContent;
+                    for (auto &elem: cur->contents) {
+                        pathContent += elem.second;
+                    }
+                    json[fullPath] = std::move(pathContent);
+                }
+            }
         }
 
         File *root = new File(true);
